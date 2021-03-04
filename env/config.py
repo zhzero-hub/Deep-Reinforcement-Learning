@@ -24,19 +24,6 @@ Local_queue_capacity = 3.84 * 1024 * 1024  # MB->B
 Edge_queue_capacity = 19.2 * 1024 * 1024  # MB->B
 
 # Parameters of the proposed RL-based algorithm
-Actor_learning_rate = 10**-4
-Critic_learning_rate = 10**-3
-Actor_hidden_units = (64, 32)
-Critic_hidden_units = (64, 32)
-Hidden_activation = "ReLU"
-Actor_output_activation = "Tanh"
-Optimizer = "Adam"
-Policy_noise = 0.2
-Target_update = 0.005
-Discount_factor = 0.85
-Minibatch_size = 64
-Replay_memory_size = 100000
-Training_episodes = 1000
 Time_slots_per_episode = 200
 
 Number_of_services = 2
