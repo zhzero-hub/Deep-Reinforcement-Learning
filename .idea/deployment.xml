@@ -1,7 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" serverName="mist@gpu25.mistgpu.xyz:36000 password" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
+      <paths name="mist">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="mist@gpu25.mistgpu.xyz:36000 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_952" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="mist@gpu35.mistgpu.xyz:47500 password">
         <serverdata>
           <mappings>

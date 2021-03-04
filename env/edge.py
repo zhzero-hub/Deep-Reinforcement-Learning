@@ -10,8 +10,8 @@ class Edge:
 
         self.data_uploaded = np.zeros((Number_of_services, Number_of_total_devices))
         self.data_delay = np.zeros((Number_of_services, Number_of_total_devices))
-        self.capacity = np.array(Edge_queue_capacity / Number_of_services)
-        # 只给了总edge的queue capacity，没有具体到每个service的，目前默认平分
+        self.capacity = np.array(Edge_queue_capacity)
+        # 只给了总edge的queue capacity，没有具体到每个service的
         self.dropped_task = np.zeros(Number_of_services)
 
         self.backlog_computation_task = np.zeros(Number_of_services)  # Q_m^t
@@ -54,13 +54,14 @@ class Edge:
         _sum = self.data_uploaded.sum(axis=1)
         task_process_delay = np.zeros((Number_of_services, Number_of_total_devices))
         task_queue_delay = np.zeros((Number_of_services, Number_of_total_devices))
-        wait_time_delay = _sum - self.data_uploaded
-        self.data_delay = wait_time_delay
+        wait_time_delay = np.zeros((Number_of_services, Number_of_total_devices))
         for i in range(Number_of_services):
             task_process_delay[i] = self.computation_intensity[i] * self.data_uploaded[i] / \
                                     (self.computation_resource_allocation[i] * self.CPU_frequency)
             task_queue_delay[i] = self.backlog_computation_task[i] * self.computation_intensity[i] / \
                                   (self.computation_resource_allocation[i] * self.CPU_frequency)
+            wait_time_delay[i] = _sum[i] - self.data_uploaded[i]
+            self.data_delay[i] = wait_time_delay[i]
             wait_time_delay[i] = self.computation_intensity[i] * wait_time_delay[i] / \
                                  (2 * self.computation_resource_allocation[i] * self.CPU_frequency)
         return task_process_delay + task_queue_delay + wait_time_delay

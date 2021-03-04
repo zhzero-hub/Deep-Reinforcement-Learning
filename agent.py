@@ -50,14 +50,14 @@ RANDOMSEED = 1  # random seed
 LR_A = 0.0001  # learning rate for actor
 LR_C = 0.001  # learning rate for critic
 GAMMA = 0.85  # reward discount
-TAU = 0.01  # soft replacement
+TAU = 0.005  # soft replacement
 MEMORY_CAPACITY = 100000  # size of replay buffer
 BATCH_SIZE = 64  # update batchsize
 
 MAX_EPISODES = 1000  # total number of episodes for training
 MAX_EP_STEPS = 200  # total number of steps for each episode
 TEST_PER_EPISODES = 10  # test the model per episodes
-VAR = 3  # control exploration
+sigma = 0.2  # control exploration
 
 
 ###############################  DDPG  ####################################
@@ -70,7 +70,7 @@ class DDPG(object):
     def __init__(self, a_dim, s_dim, a_bound):
         # memory用于储存跑的数据的数组：
         # 保存个数MEMORY_CAPACITY，s_dim * 2 + a_dim + 1：分别是两个state，一个action，和一个reward
-        self.memory = np.zeros((MEMORY_CAPACITY, s_dim * 2 + a_dim + 1), dtype=np.float64)
+        self.memory = np.zeros((MEMORY_CAPACITY, s_dim * 2 + a_dim + 1), dtype=np.float32)
         self.pointer = 0
         self.a_dim, self.s_dim, self.a_bound = a_dim, s_dim, a_bound
 
@@ -102,8 +102,8 @@ class DDPG(object):
             """
             s = tl.layers.Input(input_state_shape, name='C_s_input')
             a = tl.layers.Input(input_action_shape, name='C_a_input')
-            x = tl.layers.Concat(1)([s, a])
-            x = tl.layers.Dense(n_units=60, act=tf.nn.relu, W_init=W_init, b_init=b_init, name='C_l1')(x)
+            x = tl.layers.Concat()([s, a])
+            x = tl.layers.Dense(n_units=30, act=tf.nn.relu, W_init=W_init, b_init=b_init, name='C_l1')(x)
             x = tl.layers.Dense(n_units=1, W_init=W_init, b_init=b_init, name='C_out')(x)
             return tl.models.Model(inputs=[s, a], outputs=x, name='Critic' + name)
 
@@ -169,18 +169,21 @@ class DDPG(object):
         indices = np.random.choice(MEMORY_CAPACITY, size=BATCH_SIZE)  # 随机BATCH_SIZE个随机数
         bt = self.memory[indices, :]  # 根据indices，选取数据bt，相当于随机
         bs = bt[:, :self.s_dim]  # 从bt获得数据s
+        bs = np.reshape(bs, (BATCH_SIZE, 5, 10))
         ba = bt[:, self.s_dim:self.s_dim + self.a_dim]  # 从bt获得数据a
+        ba = np.reshape(ba, (BATCH_SIZE, 5, 10))
         br = bt[:, -self.s_dim - 1:-self.s_dim]  # 从bt获得数据r
+        br = np.repeat(br, 5).reshape((BATCH_SIZE, 5, 1))
         bs_ = bt[:, -self.s_dim:]  # 从bt获得数据s'
-
+        bs_ = np.reshape(bs_, (BATCH_SIZE, 5, 10))
         # Critic：
         # Critic更新和DQN很像，不过target不是argmax了，是用critic_target计算出来的。
         # br + GAMMA * q_
         with tf.GradientTape() as tape:
-            a_ = self.actor_target(bs_)
-            q_ = self.critic_target([bs_, a_])
-            y = br + GAMMA * q_
+            a_ = self.actor_target(inputs=bs_)
+            q_ = self.critic_target(inputs=[bs_, a_])
             q = self.critic([bs, ba])
+            y = br + GAMMA * q_
             td_error = tf.losses.mean_squared_error(y, q)
         c_grads = tape.gradient(td_error, self.critic.trainable_weights)
         self.critic_opt.apply_gradients(zip(c_grads, self.critic.trainable_weights))
@@ -207,11 +210,13 @@ class DDPG(object):
         :return: None
         """
         # 整理s，s_,方便直接输入网络计算
-        s = s.astype(np.float32)
-        s_ = s_.astype(np.float32)
+        ss = np.asarray(s).flatten()
+        # s = np.concatenate([s[0], s[1][0: 2], s[2], s[3], s[4][0: 2]])
+        ss_ = np.asarray(s_).flatten()
+        # s_ = np.concatenate([s_[0], s_[1][0: 2], s_[2], s_[3], s_[4][0: 2]])
 
         # 把s, a, [r], s_横向堆叠
-        transition = np.hstack((s, a, [r], s_))
+        transition = np.concatenate([ss, a.flatten(), [r], ss_])
 
         # pointer是记录了曾经有多少数据进来。
         # index是记录当前最新进来的数据位置。
@@ -257,10 +262,8 @@ if __name__ == '__main__':
     tf.random.set_seed(RANDOMSEED)
 
     # 定义状态空间，动作空间，动作幅度范围
-    s_dim = 0
-    for i in range(env.observation_space.spaces.__len__()):
-        s_dim += env.observation_space.spaces[i].shape[0] * env.observation_space.spaces[i].shape[1]
-    a_dim = env.action_space.shape[0] * env.action_space.shape[1]
+    s_dim = 50
+    a_dim = 50
     a_bound = env.action_space.high
 
     print('s_dim', s_dim)
@@ -286,12 +289,14 @@ if __name__ == '__main__':
                 # 因此需要需要以a为均值，VAR为标准差，建立正态分布，再从正态分布采样出a
                 # 因为a是均值，所以a的概率是最大的。但a相对其他概率由多大，是靠VAR调整。这里我们其实可以增加更新VAR，动态调整a的确定性
                 # 然后进行裁剪
-                a = np.clip(np.random.normal(a, VAR), -2, 2)
+
+                # Question: 原文的正态分布为 N(0, \sigma^2)，按参考论文意思应该是 a + N(0, \sigma^2)
+                a = np.clip(np.random.normal(loc=a, scale=sigma), 0, 1)
                 # 与环境进行互动
                 s_, r, done, info = env.step(a)
 
                 # 保存s，a，r，s_
-                ddpg.store_transition(s, a, r / 10, s_)
+                ddpg.store_transition(s, a, r, s_)
 
                 # 第一次数据满了，就可以开始学习
                 if ddpg.pointer > MEMORY_CAPACITY:
@@ -307,41 +312,41 @@ if __name__ == '__main__':
                             time.time() - t1
                         ), end=''
                     )
-                plt.show()
+                # plt.show()
             # test
-            if i and not i % TEST_PER_EPISODES:
-                t1 = time.time()
-                s = env.reset()
-                ep_reward = 0
-                for j in range(MAX_EP_STEPS):
-
-                    a = ddpg.choose_action(s)  # 注意，在测试的时候，我们就不需要用正态分布了，直接一个a就可以了。
-                    s_, r, done, info = env.step(a)
-
-                    s = s_
-                    ep_reward += r
-                    if j == MAX_EP_STEPS - 1:
-                        print(
-                            '\rEpisode: {}/{}  | Episode Reward: {:.4f}  | Running Time: {:.4f}'.format(
-                                i, MAX_EPISODES, ep_reward,
-                                time.time() - t1
-                            )
-                        )
-
-                        reward_buffer.append(ep_reward)
-
-            if reward_buffer:
-                plt.ion()
-                plt.cla()
-                plt.title('DDPG')
-                plt.plot(np.array(range(len(reward_buffer))) * TEST_PER_EPISODES, reward_buffer)  # plot the episode vt
-                plt.xlabel('episode steps')
-                plt.ylabel('normalized state-action value')
-                plt.ylim(-2000, 0)
-                plt.show()
-                plt.pause(0.1)
-        plt.ioff()
-        plt.show()
+        #     if i and not i % TEST_PER_EPISODES:
+        #         t1 = time.time()
+        #         s = env.reset()
+        #         ep_reward = 0
+        #         for j in range(MAX_EP_STEPS):
+        #
+        #             a = ddpg.choose_action(s)  # 注意，在测试的时候，我们就不需要用正态分布了，直接一个a就可以了。
+        #             s_, r, done, info = env.step(a)
+        #
+        #             s = s_
+        #             ep_reward += r
+        #             if j == MAX_EP_STEPS - 1:
+        #                 print(
+        #                     '\rEpisode: {}/{}  | Episode Reward: {:.4f}  | Running Time: {:.4f}'.format(
+        #                         i, MAX_EPISODES, ep_reward,
+        #                         time.time() - t1
+        #                     )
+        #                 )
+        #
+        #                 reward_buffer.append(ep_reward)
+        #
+        #     if reward_buffer:
+        #         plt.ion()
+        #         plt.cla()
+        #         plt.title('DDPG')
+        #         plt.plot(np.array(range(len(reward_buffer))) * TEST_PER_EPISODES, reward_buffer)  # plot the episode vt
+        #         plt.xlabel('episode steps')
+        #         plt.ylabel('normalized state-action value')
+        #         plt.ylim(-2000, 0)
+        #         plt.show()
+        #         plt.pause(0.1)
+        # plt.ioff()
+        # plt.show()
         print('\nRunning time: ', time.time() - t0)
         ddpg.save_ckpt()
 
@@ -350,7 +355,7 @@ if __name__ == '__main__':
     while True:
         s = env.reset()
         for i in range(MAX_EP_STEPS):
-            env.render()
+            # env.render()
             s, r, done, info = env.step(ddpg.choose_action(s))
             if done:
                 break

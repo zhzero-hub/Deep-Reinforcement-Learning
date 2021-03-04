@@ -92,8 +92,8 @@ class Device:
         self.rate = self.rate * math.log2(1 + Transmit_power * channel_gain / Noise_figure / sigma_square)
 
     def accuracy_cal(self):
-        temp = np.array(self.sample_rate) * np.array(Accuracy_to_sample_rate)
-        ret = temp.sum() / Number_of_devices[self.type]
+        index = np.argmax(self.sample_rate)
+        ret = Accuracy_to_sample_rate[index] / Number_of_devices[self.type]
         if self.task_offload_decision == 1:
             return ret * Accuracy_of_compressed_DNN[self.type]
         else:

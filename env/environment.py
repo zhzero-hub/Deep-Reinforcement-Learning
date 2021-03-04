@@ -3,7 +3,8 @@ from gym import spaces
 import numpy as np
 import tensorflow as tf
 import sys
-sys.path.append('H:\projects\Deep-Reinforment-Learning-Linux-master\env')  # 此时假设此 py 文件和 env 文件夹在同一目录下
+import os
+sys.path.append(os.getcwd() + "\env")  # 此时假设此 py 文件和 env 文件夹在同一目录下
 
 from devices import *
 
@@ -50,11 +51,12 @@ class IoTEnv(gym.Env):
         pass
 
     def step(self, action):
-        x = o = action
+        x = action[0: 4]
+        o = action[4]
         datum = []
         delays = []
         for i in range(Number_of_total_devices):
-            devices[i].set_sample_rate(x[i])
+            devices[i].set_sample_rate(x[0:, i])
             devices[i].set_offload_decision(o[i])
             data = devices[i].reset_state()
             datum.append(data)
@@ -83,7 +85,9 @@ class IoTEnv(gym.Env):
         return self.state, reward, done, {}
 
     def update_accuracy_deficit_queue(self):
-        self.accuracy_deficit_queue = np.max(self.accuracy + self.accuracy_deficit_queue, np.zeros(Number_of_services))
+        temp = self.accuracy + self.accuracy_deficit_queue
+        temp[temp < 0] = 0.0
+        self.accuracy_deficit_queue = temp
 
     def reset(self):
         self.accuracy = 0
