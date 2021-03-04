@@ -1,5 +1,5 @@
 import numpy as np
-from config import *
+from env.config import *
 
 
 class Edge:

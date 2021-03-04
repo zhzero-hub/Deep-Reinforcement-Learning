@@ -4,9 +4,7 @@ import numpy as np
 import tensorflow as tf
 import sys
 import os
-sys.path.append(os.getcwd() + "\env")  # 此时假设此 py 文件和 env 文件夹在同一目录下
-
-from devices import *
+from env.devices import *
 
 
 class IoTEnv(gym.Env):

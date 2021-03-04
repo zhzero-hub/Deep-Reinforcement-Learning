@@ -1,8 +1,8 @@
 import random
-from config import *
+from env.config import *
+from env.edge import *
 import numpy as np
 import math
-from edge import *
 
 
 class Device:
